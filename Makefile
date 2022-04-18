@@ -1,13 +1,13 @@
 
 FOUND_NVCC := $(shell which nvcc 2> /dev/null)
 
-demo: main.o sobel.o grayscale.o
+demo: main.o sobel.o gaussian.o grayscale.o
 ifdef FOUND_NVCC
 	@echo "Using nvcc"
-	nvcc -o demo main.o sobel.o grayscale.o -lstdc++ -L /usr/local/lib -lopencv_imgcodecs -lopencv_highgui -lopencv_core -lopencv_imgproc -lopencv_videoio -lopencv_video
+	nvcc -o demo main.o sobel.o gaussian.o grayscale.o -lstdc++ -L /usr/local/lib -lopencv_imgcodecs -lopencv_highgui -lopencv_core -lopencv_imgproc -lopencv_videoio -lopencv_video
 else
 	@echo "No nvcc on PATH, using gcc and cpu only code instead."
-	gcc -o demo main.o sobel.o grayscale.o -lstdc++ -L /usr/local/lib -lopencv_imgcodecs -lopencv_highgui -lopencv_core -lopencv_imgproc -lopencv_videoio -lopencv_video
+	gcc -o demo main.o sobel.o gaussian.o grayscale.o -lstdc++ -L /usr/local/lib -lopencv_imgcodecs -lopencv_highgui -lopencv_core -lopencv_imgproc -lopencv_videoio -lopencv_video
 endif
 
 main.o: src/main.cpp
@@ -18,6 +18,13 @@ ifdef FOUND_NVCC
 	nvcc -o sobel.o -c src/sobel.cu
 else
 	gcc -o sobel.o -c src/sobel.cpp
+endif
+
+gaussian.o: src/gaussian.cu src/gaussian.cpp
+ifdef FOUND_NVCC
+	nvcc -o gaussian.o -c src/gaussian.cu
+else
+	gcc -o gaussian.o -c src/gaussian.cpp
 endif
 
 grayscale.o: src/grayscale.cu src/grayscale.cpp

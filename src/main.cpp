@@ -2,6 +2,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "sobel.h"
+#include "gaussian.h"
 #include "grayscale.h"
 
 enum class FilterType : size_t{
@@ -30,6 +31,7 @@ int main(int argc, char** argv) {
     cv::resizeWindow("Video Stream", 1920, 1080);
 
     sobelInit();
+    gaussianInit();
     grayscaleInit();
 
     FilterType active_filter = FilterType::SOBEL;
@@ -46,6 +48,7 @@ int main(int argc, char** argv) {
             sobelFilter(cap.data, cap.rows, cap.cols);
             break;
         case FilterType::GAUSSIAN:
+            gaussianFilter(cap.data, cap.rows, cap.cols);
             break;
         case FilterType::GRAYSCALE:
             grayscaleFilter(cap.data, cap.rows, cap.cols);
@@ -76,6 +79,7 @@ int main(int argc, char** argv) {
     std::cout << cap.size << std::endl;
 
     sobelFree();
+    gaussianFree();
     grayscaleFree();
 
     return 0;
