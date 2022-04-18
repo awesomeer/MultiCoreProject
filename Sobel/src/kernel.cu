@@ -27,9 +27,9 @@ __managed__ char GY[9] = { 1, 2, 1,
 				  -1,-2,-1 };
 
 __managed__ char gaussian_kernel[9] = { 
-	1/16f, 1/8f, 1/16f,
-	1/8f, 1/4f, 1/8f,
-	1/16f, 1/8f, 1/16f,
+	1/16, 1/8, 1/16,
+	1/8, 1/4, 1/8,
+	1/16, 1/8, 1/16,
 };
 
 
@@ -99,10 +99,13 @@ void sobelOp(unsigned char * greyBuffer, int * sobelBuffer) {
 
 }
 
-__global__ void gaussian_filter(const unsigned char *gaussian_input, unsigned char *gaussian_output) {
+__global__ void gaussian_filter(const unsigned char *gaussian_input, int *gaussian_output) {
 
     const unsigned int col = threadIdx.x + blockIdx.x * blockDim.x;
     const unsigned int row = threadIdx.y + blockIdx.y * blockDim.y;
+
+	if (col >= WIDTH || row >= HEIGHT)
+		return;
 
     if(row < HEIGHT && col < WIDTH) {
         float blur = 0.0;
