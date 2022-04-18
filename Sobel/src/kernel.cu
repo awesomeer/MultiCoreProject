@@ -26,16 +26,31 @@ __managed__ char GY[9] = { 1, 2, 1,
 				   0, 0, 0,
 				  -1,-2,-1 };
 
-__managed__ char gaussian_kernel[9] = { 
-	1/16, 1/8, 1/16,
-	1/8, 1/4, 1/8,
-	1/16, 1/8, 1/16,
+// __managed__ char gaussian_kernel[9] = { 
+// 	1, 2, 1,
+// 	2, 4, 2,
+// 	1, 2, 1,
+// };
+
+__managed__ char gaussian_kernel[25] = { 
+	1, 4, 6, 4, 1,
+	4, 16, 24, 16, 4,
+	6, 24, 36, 24, 6,
+	4, 16, 24, 16, 4,
+	1, 4, 6, 4, 1
 };
+
+
+// __managed__ char gaussian_kernel[9] = { 
+// 	0, -1, 0,
+// 	-1, 5, -1,
+// 	0, -1, 0,
+// };
 
 
 unsigned char* greyScaleBuffer;
 int *sobel; //1280x720
-int *gaussian;
+unsigned char *gaussian;
 unsigned char *finished; //1280x720*3
 
 
@@ -50,6 +65,10 @@ void greyScale(unsigned char * frame, unsigned char*greyBuffer) {
 	int index = x + y * WIDTH;
 	int sum = (frame[3*index] + frame[3*index + 1] + frame[3*index + 2]) / 3;
 	greyBuffer[index] = sum;
+
+	//frame[3*index] = sum;
+	//frame[3*index+1] = sum;
+	//frame[3*index+2] = sum;
 }
 
 
@@ -99,7 +118,7 @@ void sobelOp(unsigned char * greyBuffer, int * sobelBuffer) {
 
 }
 
-__global__ void gaussian_filter(const unsigned char *gaussian_input, int *gaussian_output) {
+__global__ void gaussian_filter(const unsigned char *gaussian_input, unsigned char *gaussian_output) {
 
     const unsigned int col = threadIdx.x + blockIdx.x * blockDim.x;
     const unsigned int row = threadIdx.y + blockIdx.y * blockDim.y;
@@ -108,18 +127,31 @@ __global__ void gaussian_filter(const unsigned char *gaussian_input, int *gaussi
 		return;
 
     if(row < HEIGHT && col < WIDTH) {
-        float blur = 0.0;
-        for(int i = -1; i < 2; i++) {
-            for(int j = -1; j < 2; j++) {
+        int blur = 0;
+        for(int i = -2; i < 3; i++) {
+            for(int j = -2; j < 3; j++) {
 
                 const unsigned int y = max(0, min(HEIGHT - 1, row + i));
                 const unsigned int x = max(0, min(WIDTH - 1, col + j));
 
-                const float w = gaussian_kernel[(j + 1) + (i + 1) * 3];
+                char w = gaussian_kernel[(2-j) + (2-i) * 3];
+				//printf("%f\n", w);
                 blur += w * gaussian_input[x + y * WIDTH];
             }
         }
-        gaussian_output[col + row * WIDTH] = static_cast<unsigned char>(blur);
+		blur = blur/256;
+		blur = min(255, blur);
+		int pindex = index(col, row);
+
+		float red = gaussian_output[3 * pindex] / 256.0;
+		float green = gaussian_output[(3 * pindex) + 1] / 256.0;
+		float blue = gaussian_output[(3 * pindex) + 2] / 256.0;
+		
+		gaussian_output[3*pindex] = (unsigned char) (((float)blur)*red);
+		gaussian_output[3*pindex+1] = (unsigned char) (((float)blur)*green);
+		gaussian_output[3*pindex+2] = (unsigned char) (((float)blur)*blue);
+		
+        //gaussian_output[col + row * WIDTH] = static_cast<unsigned char>(blur);
     }
 }
 
@@ -156,14 +188,16 @@ void filter(unsigned char* frame) {
 
 	cudaMemcpy(finished, frame, SIZE, cudaMemcpyHostToDevice);
 	greyScale<<<block, thread>>>(finished, greyScaleBuffer); //Convert to grayscale
+	//printf("%d: %s\n", __LINE__, cudaGetErrorString(cudaGetLastError()));
 
 	/* sobel */
 	// sobelOp<<<block, thread>>>(greyScaleBuffer, sobel); //Compute Sobel convolution
 	// render << <block, thread >> > (sobel, finished, count++);
 
 	/* gaussian */
-	gaussian_filter<<<block, thread>>>(greyScaleBuffer, gaussian); //Compute Sobel convolution	
-	render << <block, thread >> > (gaussian, finished, count++);
+	gaussian_filter<<<block, thread>>>(greyScaleBuffer, finished); //Compute Sobel convolution	
+	//printf("%d: %s\n", __LINE__, cudaGetErrorString(cudaGetLastError()));
+	//render << <block, thread >> > (gaussian, finished, count++);
 
 	count &= 0x3FF;
 
@@ -176,7 +210,7 @@ void filter(unsigned char* frame) {
 void initCuda() {
 	cudaMalloc(&greyScaleBuffer, WIDTH * HEIGHT);
 	cudaMalloc(&sobel, sizeof(int) * WIDTH * HEIGHT * 2);
-	cudaMalloc(&gaussian, sizeof(int) * WIDTH * HEIGHT * 2);
+	cudaMalloc(&gaussian, sizeof(unsigned char) * WIDTH * HEIGHT * 3);
 	cudaMalloc(&finished, SIZE);
 }
 

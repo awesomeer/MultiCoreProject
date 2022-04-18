@@ -33,6 +33,10 @@ int main(int argc, char** argv) {
 	namedWindow("Video Stream");
 	resizeWindow("Video Stream", 1920, 1080);
 	
+	
+	//VideoWriter video("outcpp.mp4",VideoWriter::fourcc('m','p','4','v'),30, Size(1280,720));
+	
+
 	chrono::system_clock::time_point start, end;
 	chrono::duration<double> time;
 
@@ -41,6 +45,7 @@ int main(int argc, char** argv) {
 		if (cap.empty())
 			break;
 		
+		//imshow("original", cap);
 		start = chrono::system_clock::now();
 		filter(cap.data);
 		end = chrono::system_clock::now();
@@ -48,6 +53,7 @@ int main(int argc, char** argv) {
 		cout << 1 / time.count() << endl;
 		
 		imshow("Video Stream", cap);
+		//video.write(cap);
 
 		if (waitKey(10) == 27)
 			break;
@@ -55,6 +61,8 @@ int main(int argc, char** argv) {
 	unsigned char* data = cap.data;
 	cout << cap.size << endl;
 
+	//video.release();
+	cap.release();
 	freeCuda();
 
 	return 0;
