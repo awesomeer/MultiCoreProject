@@ -91,6 +91,69 @@ void greyScale(unsigned char * frame){
 }
 
 
+/**
+ * Helper struct for convolve function
+ */
+template<typename T>
+struct Vec2D{
+	T x, y;
+};
+
+struct RGB{
+	unsigned char r,g,b;
+};
+
+/**
+ * Convolve an RGB frame with a floating point matrix.
+ *
+ * @param frame the RGB frame
+ * @param frame_dim Dimensions of the frame {X, Y}
+ * @param mat the Matrix
+ * @param mat_dim Dimensions of the matrix {X, Y}
+ * @param mat_off Offset of the Matrix relative to the pixel to calculate.
+ * For normal 3x3 Matrices this should be {-1, -1}
+ * @return void. This function writes the result back into frame.
+ */
+
+void convolve(unsigned char* frame, Vec2D<size_t> frame_dim, float* mat, Vec2D<size_t> mat_dim, Vec2D<int> mat_off) {
+	const size_t buf_width = frame_dim.x + mat_dim.x - 1;
+	const size_t buf_height = frame_dim.y + mat_dim.y - 1;
+	RGB* frame_buf = (RGB*)frame;
+	RGB* buf = (RGB*)calloc(buf_width * buf_height, sizeof(RGB));
+	// Move data to new buffer with 0s at edges.
+	for (size_t i = 0; i < frame_dim.y; i++)
+	{
+		size_t dst_idx = (i - mat_off.y) * buf_width - mat_off.x;
+		size_t src_idx = i * frame_dim.x;
+		memcpy(&buf[dst_idx], &frame_buf[src_idx], frame_dim.x * sizeof(RGB));
+	}
+	// Convolve
+	for (size_t y = 0; y < frame_dim.y; y++)
+	{
+		for (size_t x = 0; x < frame_dim.x; x++)
+		{
+			float r = 0.0f, g = 0.0f, b = 0.0f;
+			for (size_t v = 0; v < mat_dim.y; v++)
+			{
+				for (size_t u = 0; u < mat_dim.x; u++)
+				{
+					float mat_val = mat[mat_dim.x * v + u];
+					size_t buf_idx = (y + v) * buf_width + (x + u);
+					r += mat_val * buf[buf_idx].r;
+					g += mat_val * buf[buf_idx].g;
+					b += mat_val * buf[buf_idx].b;
+				}
+			}
+			size_t frame_idx = y * frame_dim.x + x;
+			frame_buf[frame_idx].r = (unsigned char)r;
+			frame_buf[frame_idx].g = (unsigned char)g;
+			frame_buf[frame_idx].b = (unsigned char)b;
+		}
+	}
+	free(buf);
+}
+
+
 void sobel(unsigned char * frame){
 
 }
