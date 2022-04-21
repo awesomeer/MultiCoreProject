@@ -10,7 +10,20 @@ using namespace std;
 using namespace cv;
 
 #include <chrono>
+#include <vector>
 
+/*
+GPU
+GREY - 		552.5
+SOBEL - 	202.7
+GAUSSIAN - 	160.034
+
+CPU
+GREY - 		186
+SOBEL - 	7.3
+GAUSSIAN - 	15
+
+*/
 
 
 int main(int argc, char** argv) {
@@ -31,30 +44,33 @@ int main(int argc, char** argv) {
 
 	Mat cap;
 	initCuda();
-	//namedWindow("Video Stream");
-	//resizeWindow("Video Stream", 1920, 1080);
+	namedWindow("Video Stream");
+	resizeWindow("Video Stream", 1920, 1080);
 	
 	
 	//VideoWriter video("outcpp.mp4",VideoWriter::fourcc('m','p','4','v'),30, Size(1920,1080));
 	
+	vector<double> fps;
 
 	chrono::system_clock::time_point start, end;
 	chrono::duration<double> time;
-	FilterType filtertype = SOBEL;
+	FilterType filtertype = GAUSSIAN;
 	bool stoploop = true;
 	
+	Mat blur;
 	while (stoploop) {
 		camera >> cap;
 		if (cap.empty())
 			break;
 		
-		//imshow("original", cap);
 		start = chrono::system_clock::now();
 		filter(cap.data, filtertype);
 		end = chrono::system_clock::now();
+
 		time = end - start;
 		cout << 1 / time.count() << endl;
-		
+		fps.push_back(1.0/time.count());
+
 		imshow("Video Stream", cap);
 		//video.write(cap);
 
@@ -77,8 +93,13 @@ int main(int argc, char** argv) {
 			}
 		}
 	}
-	unsigned char* data = cap.data;
 	cout << cap.size << endl;
+
+	double sum = 0;
+	for(int i = 0; i < fps.size(); i++){
+		sum += fps[i];
+	}
+	cout << sum/fps.size() << endl;
 
 	//video.release();
 	cap.release();

@@ -20,17 +20,12 @@
 
 
 __managed__ char GX[9] = { 1, 0, -1,
-						  2, 0, -2,
-							1, 0, -1 };
+						   2, 0, -2,
+						   1, 0, -1 };
 __managed__ char GY[9] = { 1, 2, 1,
-				   0, 0, 0,
-				  -1,-2,-1 };
+				   		   0, 0, 0,
+				  		  -1,-2,-1 };
 
-// __managed__ char gaussian_kernel[9] = { 
-// 	1, 2, 1,
-// 	2, 4, 2,
-// 	1, 2, 1,
-// };
 
 __managed__ char gaussian_kernel[25] = { 
 	1, 4, 6, 4, 1,
@@ -40,15 +35,8 @@ __managed__ char gaussian_kernel[25] = {
 	1, 4, 6, 4, 1
 };
 
-
-// __managed__ char gaussian_kernel[9] = { 
-// 	0, -1, 0,
-// 	-1, 5, -1,
-// 	0, -1, 0,
-// };
-
 unsigned char *gaussian;
-unsigned char *finished; //1280x720*3
+unsigned char *finished;
 
 
 __device__ __forceinline__
@@ -147,8 +135,7 @@ __global__ void gaussian_filter(const unsigned char *gaussian_input, unsigned ch
 
 		blur = min(255, blur/256);
 		int pindex = 3*index(col,row);
-		float color = gaussian_input[pindex+p] / 256.0;
-		gaussian_output[pindex+p] = (unsigned char) (((float)blur)*color);
+		gaussian_output[pindex+p] = blur;
 	}
 
 }
@@ -166,10 +153,14 @@ void filter(unsigned char* frame, FilterType filtertype) {
 			break;
 		}
 		case SOBEL:{
-			sobelOp<<<block, thread>>>(gaussian, finished); //Compute Sobel convolution
+			sobelOp<<<block, thread>>>(gaussian, finished);
 			break;
 		}
 		case GAUSSIAN:{
+			for(int i = 0; i < 4; i++){
+				gaussian_filter<<<block, thread>>>(gaussian, finished);
+				cudaMemcpy(gaussian, finished, SIZE, cudaMemcpyDeviceToDevice);
+			}
 			gaussian_filter<<<block, thread>>>(gaussian, finished);
 			break;
 		}
