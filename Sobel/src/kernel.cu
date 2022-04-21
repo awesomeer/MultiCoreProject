@@ -102,10 +102,9 @@ void sobelOp(unsigned char * frame, unsigned char * sobel) {
 
 		int pindex = 3*index(x, y);
 		int mag = (int)sqrt((double) xDir * xDir + yDir * yDir);
-		mag = min(255, mag);
+		mag = max(0, min(255, mag));
 
-		float color = frame[pindex + p] / 256.0;
-		sobel[pindex + p] = color * mag;
+		sobel[pindex + p] = mag;
 	}
 
 }
