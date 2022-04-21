@@ -86,7 +86,7 @@ void greyScale(unsigned char * frame, unsigned char*greyBuffer) {
 
 
 __global__
-void sobelOp(unsigned char * greyBuffer, unsigned char * sobelBuffer) {
+void sobelOp(unsigned char * frame, unsigned char * sobel) {
 	int x = threadIdx.x + blockDim.x * blockIdx.x;
 	int y = threadIdx.y + blockDim.y * blockIdx.y;
 
@@ -107,8 +107,8 @@ void sobelOp(unsigned char * greyBuffer, unsigned char * sobelBuffer) {
 
 				int pindex = 3*index(col, row);
 
-				xDir += greyBuffer[pindex+p] * GX[(1 - c) + (1 - r) * 3];
-				yDir += greyBuffer[pindex+p] * GY[(1 - c) + (1 - r) * 3];
+				xDir += frame[pindex+p] * GX[(1 - c) + (1 - r) * 3];
+				yDir += frame[pindex+p] * GY[(1 - c) + (1 - r) * 3];
 			}
 		}
 
@@ -116,8 +116,8 @@ void sobelOp(unsigned char * greyBuffer, unsigned char * sobelBuffer) {
 		int mag = (int)sqrt((double) xDir * xDir + yDir * yDir);
 		mag = min(255, mag);
 
-		float color = greyBuffer[pindex + p] / 256.0;
-		sobelBuffer[pindex + p] = color * mag;
+		float color = frame[pindex + p] / 256.0;
+		sobel[pindex + p] = color * mag;
 	}
 
 }
@@ -174,7 +174,7 @@ void filter(unsigned char* frame, FilterType filtertype) {
 			break;
 		}
 	}
-	
+
 	cudaMemcpy(frame, finished, SIZE, cudaMemcpyDeviceToHost);
 }
 
