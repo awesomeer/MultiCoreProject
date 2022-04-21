@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
 	for(int i = 0; i < fps.size(); i++){
 		sum += fps[i];
 	}
-	cout << sum/fps.size() << endl;
+	cout << "Average FPS: " << sum/fps.size() << endl;
 
 	//video.release();
 	cap.release();
