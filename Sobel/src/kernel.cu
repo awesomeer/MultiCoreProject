@@ -14,8 +14,8 @@
 */
 
 
-#define HEIGHT 720
-#define WIDTH 1280
+#define HEIGHT 1080
+#define WIDTH 1920
 #define SIZE (3 * WIDTH * HEIGHT)
 
 
@@ -143,7 +143,7 @@ __global__ void gaussian_filter(const unsigned char *gaussian_input, unsigned ch
                 const unsigned int y = max(0, min(HEIGHT - 1, row + i));
                 const unsigned int x = max(0, min(WIDTH - 1, col + j));
 
-                char w = gaussian_kernel[(2-j) + (2-i) * 3];
+                char w = gaussian_kernel[(2-j) + (2-i) * 5];
 				//printf("%f\n", w);
                 blur += w * gaussian_input[x + y * WIDTH];
             }

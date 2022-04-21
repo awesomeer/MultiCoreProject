@@ -27,6 +27,7 @@ int main(int argc, char** argv) {
 	camera.set(CAP_PROP_FRAME_WIDTH, 1920);
 	camera.set(CAP_PROP_FRAME_HEIGHT, 1080);
 
+	//cout << camera.get(CAP_PROP_FRAME_WIDTH) << "x" << camera.get(CAP_PROP_FRAME_HEIGHT) << endl;
 
 	Mat cap;
 	initCuda();
@@ -52,7 +53,7 @@ int main(int argc, char** argv) {
 		filter(cap.data, filtertype);
 		end = chrono::system_clock::now();
 		time = end - start;
-		cout << 1 / time.count() << endl;
+		//cout << 1 / time.count() << endl;
 		
 		imshow("Video Stream", cap);
 		//video.write(cap);
