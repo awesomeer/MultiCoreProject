@@ -40,7 +40,7 @@ int main(int argc, char** argv) {
 
 	chrono::system_clock::time_point start, end;
 	chrono::duration<double> time;
-	FilterType filtertype = GAUSSIAN;
+	FilterType filtertype = SOBEL;
 	bool stoploop = true;
 	
 	while (stoploop) {

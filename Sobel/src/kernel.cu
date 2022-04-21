@@ -47,41 +47,11 @@ __managed__ char gaussian_kernel[25] = {
 // 	0, -1, 0,
 // };
 
-
-unsigned char* greyScaleBuffer;
-int *sobel; //1280x720
 unsigned char *gaussian;
 unsigned char *finished; //1280x720*3
 
 
-__global__
-void greyScale(unsigned char * frame, unsigned char*greyBuffer) {
-	int x = threadIdx.x + blockDim.x * blockIdx.x;
-	int y = threadIdx.y + blockDim.y * blockIdx.y;
-
-	if (x >= WIDTH || y >= HEIGHT)
-		return;
-
-	int index = x + y * WIDTH;
-	int sum = (frame[3*index] + frame[3*index + 1] + frame[3*index + 2]) / 3;
-	greyBuffer[index] = sum;
-}
-
-__global__
-void greycopy(unsigned char * grey, unsigned char * frame){
-	int x = threadIdx.x + blockDim.x * blockIdx.x;
-	int y = threadIdx.y + blockDim.y * blockIdx.y;
-
-	if (x >= WIDTH || y >= HEIGHT)
-		return;
-
-	int pindex = x + y * WIDTH;
-	frame[3*pindex] = grey[pindex];
-	frame[3*pindex+1] = grey[pindex];
-	frame[3*pindex+2] = grey[pindex];
-}
-
-__device__
+__device__ __forceinline__
 int index(int x, int y) {
 	if (x >= WIDTH || y >= HEIGHT || x < 0 || y < 0)
 		return -1;
@@ -92,44 +62,62 @@ int index(int x, int y) {
 __device__ __forceinline__
 int wrap(int val, int limit) {
 	if (val < 0)
-		return limit - 1;
+		return limit + val;
 	return val % limit;
 }
 
+
+
 __global__
-void sobelOp(unsigned char * greyBuffer, int * sobelBuffer) {
+void greyScale(unsigned char * frame, unsigned char*greyBuffer) {
 	int x = threadIdx.x + blockDim.x * blockIdx.x;
 	int y = threadIdx.y + blockDim.y * blockIdx.y;
 
 	if (x >= WIDTH || y >= HEIGHT)
 		return;
 
-	int xDir[3] = {0,0,0};
-	int yDir[3] = {0,0,0};
+	int pindex = 3*index(x,y);
+	int sum = (frame[pindex] + frame[pindex + 1] + frame[pindex + 2]) / 3;
 
-	for (int r = -1; r < 2; r++) {
-		int row = y + r;
-		row = wrap(row, HEIGHT);
+	greyBuffer[pindex] = sum;
+	greyBuffer[pindex+1] = sum;
+	greyBuffer[pindex+2] = sum;
+}
 
-		for (int c = -1; c < 2; c++) {
-			int col = x + c;
-			col = wrap(col, WIDTH);
 
-			int pindex = 3*index(col, row);
+__global__
+void sobelOp(unsigned char * greyBuffer, unsigned char * sobelBuffer) {
+	int x = threadIdx.x + blockDim.x * blockIdx.x;
+	int y = threadIdx.y + blockDim.y * blockIdx.y;
 
-			for(int i = 0; i < 3; i++){
-				xDir[i] += greyBuffer[pindex+i] * GX[(1 - c) + (1 - r) * 3];
-				yDir[i] += greyBuffer[pindex+i] * GY[(1 - c) + (1 - r) * 3];	
+	if (x >= WIDTH || y >= HEIGHT)
+		return;
+
+	for(int p = 0; p < 3; p++){
+		int xDir = 0;
+		int yDir = 0;
+
+		for (int r = -1; r < 2; r++) {
+			int row = y + r;
+			row = wrap(row, HEIGHT);
+
+			for (int c = -1; c < 2; c++) {
+				int col = x + c;
+				col = wrap(col, WIDTH);
+
+				int pindex = 3*index(col, row);
+
+				xDir += greyBuffer[pindex+p] * GX[(1 - c) + (1 - r) * 3];
+				yDir += greyBuffer[pindex+p] * GY[(1 - c) + (1 - r) * 3];
 			}
 		}
-	}
 
-	__syncthreads();
+		int pindex = 3*index(x, y);
+		int mag = (int)sqrt((double) xDir * xDir + yDir * yDir);
+		mag = min(255, mag);
 
-	int pindex = 6*(index(x,y));
-	for(int i = 0; i < 3; i++){
-		sobelBuffer[pindex+(i*2)] = xDir[i];
-		sobelBuffer[pindex+(i*2)+1] = yDir[i];
+		float color = greyBuffer[pindex + p] / 256.0;
+		sobelBuffer[pindex + p] = color * mag;
 	}
 
 }
@@ -142,93 +130,62 @@ __global__ void gaussian_filter(const unsigned char *gaussian_input, unsigned ch
 	if (col >= WIDTH || row >= HEIGHT)
 		return;
 
-	int blur[3] = {0,0,0};
-	for(int i = -2; i < 3; i++) {
-		for(int j = -2; j < 3; j++) {
+	for(int p = 0; p < 3; p++){
+		int blur = 0;
 
-			const unsigned int y = max(0, min(HEIGHT - 1, row + i));
-			const unsigned int x = max(0, min(WIDTH - 1, col + j));
+		for(int i = -2; i < 3; i++) {
+			for(int j = -2; j < 3; j++) {
 
-			char w = gaussian_kernel[(2-j) + (2-i) * 5];
-			//printf("%f\n", w);
-			int pindex = 3*index(x,y);
-			for(int i = 0; i < 3; i++){
-				blur[i] += w * gaussian_input[pindex+i];
+				const unsigned int y = wrap(row+i, HEIGHT);
+				const unsigned int x = wrap(col+j, WIDTH);
+
+				char w = gaussian_kernel[(2-j) + (2-i) * 5];
+				int pindex = 3*index(x,y);
+				blur += w * gaussian_input[pindex+p];
 			}
 		}
-	}
 
-	int pindex = 3*index(col, row);
-	for(int i = 0; i < 3; i++){	
-		blur[i] = min(255, blur[i]/256);
-		float color = gaussian_input[pindex+i] / 256.0;
-		gaussian_output[pindex+i] = (unsigned char) (((float)blur[i])*color);
+		blur = min(255, blur/256);
+		int pindex = 3*index(col,row);
+		float color = gaussian_input[pindex+p] / 256.0;
+		gaussian_output[pindex+p] = (unsigned char) (((float)blur)*color);
 	}
 
 }
 
-__global__
-void render(int* sobolBuffer, unsigned char* frame) {
-	int x = threadIdx.x + blockDim.x * blockIdx.x;
-	int y = threadIdx.y + blockDim.y * blockIdx.y;
-
-	if (x >= WIDTH || y >= HEIGHT)
-		return;
-
-	int index = x + y * WIDTH;
-
-	for(int i = 0; i < 3; i++){
-		int xv = sobolBuffer[(6*index) + (2*i)];
-		int yv = sobolBuffer[(6*index) + (2*i)+1];
-		int mag = (int)sqrt((double) xv * xv + yv * yv);
-		mag = min(255, mag);
-
-		float color = frame[(3 * index) + i] / 256.0;
-		frame[(3 * index) + i] = color * mag;	
-	}
-}
 
 void filter(unsigned char* frame, FilterType filtertype) {
 	dim3 thread(32, 32);
-	dim3 block(WIDTH/32 + 1, HEIGHT/32 + 1);
-	//dim3 block(40, 23);
+	dim3 block((WIDTH+31)/32, (HEIGHT+31)/32);
 
-	cudaMemcpy(finished, frame, SIZE, cudaMemcpyHostToDevice);
+	cudaMemcpy(gaussian, frame, SIZE, cudaMemcpyHostToDevice);
 
 	switch(filtertype){
 		case GREY:{
-			greyScale<<<block, thread>>>(finished, greyScaleBuffer);
-			greycopy<<<block, thread>>>(greyScaleBuffer, finished);
+			greyScale<<<block, thread>>>(gaussian, finished);
 			break;
 		}
 		case SOBEL:{
-			sobelOp<<<block, thread>>>(finished, sobel); //Compute Sobel convolution
-			render << <block, thread >> > (sobel, finished);
+			sobelOp<<<block, thread>>>(gaussian, finished); //Compute Sobel convolution
 			break;
 		}
 		case GAUSSIAN:{
-			cudaMemcpy(gaussian, finished, SIZE, cudaMemcpyDeviceToDevice);
 			gaussian_filter<<<block, thread>>>(gaussian, finished);
 			break;
 		}
 	}
-
-	cudaDeviceSynchronize();
+	
 	cudaMemcpy(frame, finished, SIZE, cudaMemcpyDeviceToHost);
 }
 
 
 #include <stdio.h>
 void initCuda() {
-	cudaMalloc(&greyScaleBuffer, WIDTH * HEIGHT);
-	cudaMalloc(&sobel, sizeof(int) * WIDTH * HEIGHT * 6);
-	cudaMalloc(&gaussian, sizeof(unsigned char) * WIDTH * HEIGHT * 3);
+	cudaMalloc(&gaussian, SIZE);
 	cudaMalloc(&finished, SIZE);
 }
 
 void freeCuda() {
-	cudaFree(greyScaleBuffer);
-	cudaFree(sobel);
 	cudaFree(gaussian);
 	cudaFree(finished);
 }
