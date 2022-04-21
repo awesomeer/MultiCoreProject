@@ -65,12 +65,21 @@ void greyScale(unsigned char * frame, unsigned char*greyBuffer) {
 	int index = x + y * WIDTH;
 	int sum = (frame[3*index] + frame[3*index + 1] + frame[3*index + 2]) / 3;
 	greyBuffer[index] = sum;
-
-	//frame[3*index] = sum;
-	//frame[3*index+1] = sum;
-	//frame[3*index+2] = sum;
 }
 
+__global__
+void greycopy(unsigned char * grey, unsigned char * frame){
+	int x = threadIdx.x + blockDim.x * blockIdx.x;
+	int y = threadIdx.y + blockDim.y * blockIdx.y;
+
+	if (x >= WIDTH || y >= HEIGHT)
+		return;
+
+	int pindex = x + y * WIDTH;
+	frame[3*pindex] = grey[pindex];
+	frame[3*pindex+1] = grey[pindex];
+	frame[3*pindex+2] = grey[pindex];
+}
 
 __device__
 int index(int x, int y) {
@@ -150,13 +159,12 @@ __global__ void gaussian_filter(const unsigned char *gaussian_input, unsigned ch
 		gaussian_output[3*pindex] = (unsigned char) (((float)blur)*red);
 		gaussian_output[3*pindex+1] = (unsigned char) (((float)blur)*green);
 		gaussian_output[3*pindex+2] = (unsigned char) (((float)blur)*blue);
-		
-        //gaussian_output[col + row * WIDTH] = static_cast<unsigned char>(blur);
+
     }
 }
 
 __global__
-void render(int* sobolBuffer, unsigned char* frame, unsigned short time) {
+void render(int* sobolBuffer, unsigned char* frame) {
 	int x = threadIdx.x + blockDim.x * blockIdx.x;
 	int y = threadIdx.y + blockDim.y * blockIdx.y;
 
@@ -180,26 +188,31 @@ void render(int* sobolBuffer, unsigned char* frame, unsigned short time) {
 	frame[(3 * index) + 2] = blue * mag;
 }
 
-void filter(unsigned char* frame) {
-	static unsigned short count = 0;
+void filter(unsigned char* frame, FilterType filtertype) {
 	dim3 thread(32, 32);
 	dim3 block(WIDTH/32 + 1, HEIGHT/32 + 1);
 	//dim3 block(40, 23);
 
 	cudaMemcpy(finished, frame, SIZE, cudaMemcpyHostToDevice);
-	greyScale<<<block, thread>>>(finished, greyScaleBuffer); //Convert to grayscale
-	//printf("%d: %s\n", __LINE__, cudaGetErrorString(cudaGetLastError()));
 
-	/* sobel */
-	// sobelOp<<<block, thread>>>(greyScaleBuffer, sobel); //Compute Sobel convolution
-	// render << <block, thread >> > (sobel, finished, count++);
-
-	/* gaussian */
-	gaussian_filter<<<block, thread>>>(greyScaleBuffer, finished); //Compute Sobel convolution	
-	//printf("%d: %s\n", __LINE__, cudaGetErrorString(cudaGetLastError()));
-	//render << <block, thread >> > (gaussian, finished, count++);
-
-	count &= 0x3FF;
+	switch(filtertype){
+		case GREY:{
+			greyScale<<<block, thread>>>(finished, greyScaleBuffer);
+			greycopy<<<block, thread>>>(greyScaleBuffer, finished);
+			break;
+		}
+		case SOBEL:{
+			greyScale<<<block, thread>>>(finished, greyScaleBuffer);
+			sobelOp<<<block, thread>>>(greyScaleBuffer, sobel); //Compute Sobel convolution
+			render << <block, thread >> > (sobel, finished);
+			break;
+		}
+		case GAUSSIAN:{
+			greyScale<<<block, thread>>>(finished, greyScaleBuffer);
+			gaussian_filter<<<block, thread>>>(greyScaleBuffer, finished);
+			break;
+		}
+	}
 
 	cudaDeviceSynchronize();
 	cudaMemcpy(frame, finished, SIZE, cudaMemcpyDeviceToHost);

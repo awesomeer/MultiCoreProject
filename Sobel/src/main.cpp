@@ -39,15 +39,17 @@ int main(int argc, char** argv) {
 
 	chrono::system_clock::time_point start, end;
 	chrono::duration<double> time;
-
-	while (true) {
+	FilterType filtertype = GREY;
+	bool stoploop = true;
+	
+	while (stoploop) {
 		camera >> cap;
 		if (cap.empty())
 			break;
 		
 		//imshow("original", cap);
 		start = chrono::system_clock::now();
-		filter(cap.data);
+		filter(cap.data, filtertype);
 		end = chrono::system_clock::now();
 		time = end - start;
 		cout << 1 / time.count() << endl;
@@ -55,8 +57,24 @@ int main(int argc, char** argv) {
 		imshow("Video Stream", cap);
 		//video.write(cap);
 
-		if (waitKey(10) == 27)
-			break;
+		switch(waitKey(10)){
+			case 27:{
+				stoploop = false;
+				break;
+			}
+			case 49:{
+				filtertype = GREY;
+				break;
+			}
+			case 50:{
+				filtertype = SOBEL;
+				break;
+			}
+			case 51:{
+				filtertype = GAUSSIAN;
+				break;
+			}
+		}
 	}
 	unsigned char* data = cap.data;
 	cout << cap.size << endl;
