@@ -104,8 +104,8 @@ void sobelOp(unsigned char * greyBuffer, int * sobelBuffer) {
 	if (x >= WIDTH || y >= HEIGHT)
 		return;
 
-	int xDir = 0;
-	int yDir = 0;
+	int xDir[3] = {0,0,0};
+	int yDir[3] = {0,0,0};
 
 	for (int r = -1; r < 2; r++) {
 		int row = y + r;
@@ -115,15 +115,22 @@ void sobelOp(unsigned char * greyBuffer, int * sobelBuffer) {
 			int col = x + c;
 			col = wrap(col, WIDTH);
 
-			xDir += greyBuffer[index(col, row)] * GX[(1 - c) + (1 - r) * 3];
-			yDir += greyBuffer[index(col, row)] * GY[(1 - c) + (1 - r) * 3];
+			int pindex = 3*index(col, row);
+
+			for(int i = 0; i < 3; i++){
+				xDir[i] += greyBuffer[pindex+i] * GX[(1 - c) + (1 - r) * 3];
+				yDir[i] += greyBuffer[pindex+i] * GY[(1 - c) + (1 - r) * 3];	
+			}
 		}
 	}
 
 	__syncthreads();
 
-	sobelBuffer[2*index(x, y)] = xDir;
-	sobelBuffer[2*index(x, y)+1] = yDir;
+	int pindex = 6*(index(x,y));
+	for(int i = 0; i < 3; i++){
+		sobelBuffer[pindex+(i*2)] = xDir[i];
+		sobelBuffer[pindex+(i*2)+1] = yDir[i];
+	}
 
 }
 
@@ -135,32 +142,29 @@ __global__ void gaussian_filter(const unsigned char *gaussian_input, unsigned ch
 	if (col >= WIDTH || row >= HEIGHT)
 		return;
 
-    if(row < HEIGHT && col < WIDTH) {
-        int blur = 0;
-        for(int i = -2; i < 3; i++) {
-            for(int j = -2; j < 3; j++) {
+	int blur[3] = {0,0,0};
+	for(int i = -2; i < 3; i++) {
+		for(int j = -2; j < 3; j++) {
 
-                const unsigned int y = max(0, min(HEIGHT - 1, row + i));
-                const unsigned int x = max(0, min(WIDTH - 1, col + j));
+			const unsigned int y = max(0, min(HEIGHT - 1, row + i));
+			const unsigned int x = max(0, min(WIDTH - 1, col + j));
 
-                char w = gaussian_kernel[(2-j) + (2-i) * 5];
-				//printf("%f\n", w);
-                blur += w * gaussian_input[x + y * WIDTH];
-            }
-        }
-		blur = blur/256;
-		blur = min(255, blur);
-		int pindex = index(col, row);
+			char w = gaussian_kernel[(2-j) + (2-i) * 5];
+			//printf("%f\n", w);
+			int pindex = 3*index(x,y);
+			for(int i = 0; i < 3; i++){
+				blur[i] += w * gaussian_input[pindex+i];
+			}
+		}
+	}
 
-		float red = gaussian_output[3 * pindex] / 256.0;
-		float green = gaussian_output[(3 * pindex) + 1] / 256.0;
-		float blue = gaussian_output[(3 * pindex) + 2] / 256.0;
-		
-		gaussian_output[3*pindex] = (unsigned char) (((float)blur)*red);
-		gaussian_output[3*pindex+1] = (unsigned char) (((float)blur)*green);
-		gaussian_output[3*pindex+2] = (unsigned char) (((float)blur)*blue);
+	int pindex = 3*index(col, row);
+	for(int i = 0; i < 3; i++){	
+		blur[i] = min(255, blur[i]/256);
+		float color = gaussian_input[pindex+i] / 256.0;
+		gaussian_output[pindex+i] = (unsigned char) (((float)blur[i])*color);
+	}
 
-    }
 }
 
 __global__
@@ -173,19 +177,15 @@ void render(int* sobolBuffer, unsigned char* frame) {
 
 	int index = x + y * WIDTH;
 
-	float red = frame[3 * index] / 256.0;
-	float green = frame[(3 * index) + 1] / 256.0;
-	float blue = frame[(3 * index) + 2] / 256.0;
+	for(int i = 0; i < 3; i++){
+		int xv = sobolBuffer[(6*index) + (2*i)];
+		int yv = sobolBuffer[(6*index) + (2*i)+1];
+		int mag = (int)sqrt((double) xv * xv + yv * yv);
+		mag = min(255, mag);
 
-	int xv = sobolBuffer[2 * index];
-	int yv = sobolBuffer[2 * index + 1];
-	int mag = (int)sqrt((double) xv * xv + yv * yv);
-	if (mag > 255)
-		mag = 255;
-
-	frame[3 * index] = red * mag;
-	frame[(3 * index) + 1] = green * mag;
-	frame[(3 * index) + 2] = blue * mag;
+		float color = frame[(3 * index) + i] / 256.0;
+		frame[(3 * index) + i] = color * mag;	
+	}
 }
 
 void filter(unsigned char* frame, FilterType filtertype) {
@@ -202,14 +202,13 @@ void filter(unsigned char* frame, FilterType filtertype) {
 			break;
 		}
 		case SOBEL:{
-			greyScale<<<block, thread>>>(finished, greyScaleBuffer);
-			sobelOp<<<block, thread>>>(greyScaleBuffer, sobel); //Compute Sobel convolution
+			sobelOp<<<block, thread>>>(finished, sobel); //Compute Sobel convolution
 			render << <block, thread >> > (sobel, finished);
 			break;
 		}
 		case GAUSSIAN:{
-			greyScale<<<block, thread>>>(finished, greyScaleBuffer);
-			gaussian_filter<<<block, thread>>>(greyScaleBuffer, finished);
+			cudaMemcpy(gaussian, finished, SIZE, cudaMemcpyDeviceToDevice);
+			gaussian_filter<<<block, thread>>>(gaussian, finished);
 			break;
 		}
 	}
@@ -222,7 +221,7 @@ void filter(unsigned char* frame, FilterType filtertype) {
 #include <stdio.h>
 void initCuda() {
 	cudaMalloc(&greyScaleBuffer, WIDTH * HEIGHT);
-	cudaMalloc(&sobel, sizeof(int) * WIDTH * HEIGHT * 2);
+	cudaMalloc(&sobel, sizeof(int) * WIDTH * HEIGHT * 6);
 	cudaMalloc(&gaussian, sizeof(unsigned char) * WIDTH * HEIGHT * 3);
 	cudaMalloc(&finished, SIZE);
 }

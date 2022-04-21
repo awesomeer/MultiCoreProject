@@ -31,16 +31,16 @@ int main(int argc, char** argv) {
 
 	Mat cap;
 	initCuda();
-	namedWindow("Video Stream");
-	resizeWindow("Video Stream", 1920, 1080);
+	//namedWindow("Video Stream");
+	//resizeWindow("Video Stream", 1920, 1080);
 	
 	
-	//VideoWriter video("outcpp.mp4",VideoWriter::fourcc('m','p','4','v'),30, Size(1280,720));
+	//VideoWriter video("outcpp.mp4",VideoWriter::fourcc('m','p','4','v'),30, Size(1920,1080));
 	
 
 	chrono::system_clock::time_point start, end;
 	chrono::duration<double> time;
-	FilterType filtertype = GREY;
+	FilterType filtertype = GAUSSIAN;
 	bool stoploop = true;
 	
 	while (stoploop) {
@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
 		filter(cap.data, filtertype);
 		end = chrono::system_clock::now();
 		time = end - start;
-		//cout << 1 / time.count() << endl;
+		cout << 1 / time.count() << endl;
 		
 		imshow("Video Stream", cap);
 		//video.write(cap);
