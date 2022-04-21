@@ -19,22 +19,6 @@
 #define SIZE (3 * WIDTH * HEIGHT)
 
 
-__managed__ char GX[9] = { 1, 0, -1,
-						   2, 0, -2,
-						   1, 0, -1 };
-__managed__ char GY[9] = { 1, 2, 1,
-				   		   0, 0, 0,
-				  		  -1,-2,-1 };
-
-
-__managed__ char gaussian_kernel[25] = { 
-	1, 4, 6, 4, 1,
-	4, 16, 24, 16, 4,
-	6, 24, 36, 24, 6,
-	4, 16, 24, 16, 4,
-	1, 4, 6, 4, 1
-};
-
 unsigned char *gaussian;
 unsigned char *finished;
 
@@ -81,6 +65,12 @@ void sobelOp(unsigned char * frame, unsigned char * sobel) {
 	if (x >= WIDTH || y >= HEIGHT)
 		return;
 
+	char GX[9] = { 1, 0, -1,
+			2, 0, -2,
+			1, 0, -1 };
+	char GY[9] = { 1, 2, 1,
+			   0, 0, 0,
+			 -1,-2,-1 };
 	for(int p = 0; p < 3; p++){
 		int xDir = 0;
 		int yDir = 0;
@@ -116,6 +106,14 @@ __global__ void gaussian_filter(const unsigned char *gaussian_input, unsigned ch
 
 	if (col >= WIDTH || row >= HEIGHT)
 		return;
+
+	 char gaussian_kernel[25] = { 
+		1, 4, 6, 4, 1,
+		4, 16, 24, 16, 4,
+		6, 24, 36, 24, 6,
+		4, 16, 24, 16, 4,
+		1, 4, 6, 4, 1
+	};
 
 	for(int p = 0; p < 3; p++){
 		int blur = 0;
@@ -156,7 +154,7 @@ void filter(unsigned char* frame, FilterType filtertype) {
 			break;
 		}
 		case GAUSSIAN:{
-			for(int i = 0; i < 4; i++){
+			for(int i = 0; i < 9; i++){
 				gaussian_filter<<<block, thread>>>(gaussian, finished);
 				cudaMemcpy(gaussian, finished, SIZE, cudaMemcpyDeviceToDevice);
 			}
