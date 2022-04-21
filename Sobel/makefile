@@ -9,3 +9,6 @@ main.o: src/main.cpp
 kernel.o: src/kernel.cu
 	nvcc -g -c src/kernel.cu
 
+clean:
+	rm *.o
+	rm filter
