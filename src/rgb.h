@@ -1,9 +1,6 @@
 #pragma once
 
 #include <cstdint>
+#include "vec.h"
 
-struct RGB {
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
-};
+typedef Vec3D<uint8_t> RGB;

@@ -3,6 +3,7 @@
 
 void grayscaleInit()
 {
+    // Not used
 }
 
 void grayscaleFilter(uint8_t* frame, size_t rows, size_t cols)
@@ -20,4 +21,5 @@ void grayscaleFilter(uint8_t* frame, size_t rows, size_t cols)
 
 void grayscaleFree()
 {
+    // Not used
 }

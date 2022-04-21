@@ -1,23 +1,20 @@
-#include "grayscale.h"
-#include "rgb.h"
+#include "gaussian.h"
+#include <vector>
+#include "convolution.hpp"
 
-void gaussianInit()
-{
+float gaussian[9] = {1.0f / 16.0f, 1.0f / 8.0f, 1.0f / 16.0f,
+                     1.0f / 8.0f,  1.0f / 4.0f, 1.0f / 8.0f,
+                     1.0f / 16.0f, 1.0f / 8.0f, 1.0f / 16.0f };
+
+void gaussianInit() {
+    // Not used
 }
 
-void gaussianFilter(uint8_t* frame, size_t rows, size_t cols)
-{
-    RGB* buf = (RGB*)frame;
-    for (size_t i = 0; i < rows * cols; i++)
-    {
-        // https://en.wikipedia.org/wiki/Grayscale
-
-        float tmp = 0.2126f * buf[i].r + 0.7152f * buf[i].g + 0.0722f * buf[i].b;
-        uint8_t gray = (uint8_t)tmp;
-        buf[i] = {gray, gray, gray};
-    }
+void gaussianFilter(uint8_t* frame, size_t rows, size_t cols) {
+    std::vector<RGB> buf((RGB*)frame, (RGB*)frame + rows * cols);
+    convolve(buf.data(), (RGB*)frame, { cols, rows }, gaussian, { 3, 3 }, { -1, -1 });
 }
 
-void gaussianFree()
-{
+void gaussianFree() {
+    // Not used
 }

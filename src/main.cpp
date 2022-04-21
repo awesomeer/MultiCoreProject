@@ -1,5 +1,8 @@
 #include <iostream>
+#include <algorithm>
+#include <chrono>
 #include <opencv2/opencv.hpp>
+#include <opencv2/imgproc.hpp>
 
 #include "sobel.h"
 #include "gaussian.h"
@@ -36,11 +39,16 @@ int main(int argc, char** argv) {
 
     FilterType active_filter = FilterType::SOBEL;
     bool should_stop = false;
+    //size_t blur_size = 3;
+    //float* blur_mat = (float*)malloc(blur_size * blur_size * sizeof(float));
+    //std::fill_n(blur_mat, blur_size * blur_size, 1.0f / (float)(blur_size * blur_size));
 
     while (!should_stop) {
         camera >> cap;
         if (cap.empty())
             break;
+
+        auto start = std::chrono::high_resolution_clock::now();
 
         switch (active_filter)
         {
@@ -57,6 +65,15 @@ int main(int argc, char** argv) {
             break;
         }
 
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<float> frame_time = end - start;
+        float fps = 1.0f / frame_time.count();
+        cv::String fps_text = std::to_string(fps).substr(0, 5) +" FPS";
+        cv::Point org = cv::Point(cap.cols - 200, 30);
+        int font = cv::HersheyFonts::FONT_HERSHEY_SIMPLEX;
+        double font_scale = 1.0;
+        cv::Scalar color = { 0, 255, 0 };
+        cv::putText(cap, fps_text, org, font, font_scale, color);
         cv::imshow("Video Stream", cap);
 
         switch (cv::waitKey(10)) {
@@ -65,13 +82,32 @@ int main(int argc, char** argv) {
             break;
         case 49: // 1
             active_filter = FilterType::SOBEL;
+            std::cout << "Sobel" << std::endl;
             break;
         case 50: // 2
             active_filter = FilterType::GAUSSIAN;
+            std::cout << "Gaussian Blur" << std::endl;
             break;
         case 51: // 3
             active_filter = FilterType::GRAYSCALE;
+            std::cout << "Grayscale" << std::endl;
             break;
+        //case 46: //.
+        //    blur_size++;
+        //    free(blur_mat);
+        //    blur_mat = (float*)malloc(blur_size * blur_size * sizeof(float));
+        //    std::fill_n(blur_mat, blur_size * blur_size, 1.0f / (float)(blur_size * blur_size));
+        //    std::cout << "Blur size " << blur_size << std::endl;
+        //    break;
+        //case 44: //,
+        //    if (blur_size > 1) {
+        //        blur_size--;
+        //        free(blur_mat);
+        //        blur_mat = (float*)malloc(blur_size * blur_size * sizeof(float));
+        //        std::fill_n(blur_mat, blur_size * blur_size, 1.0f / (float)(blur_size * blur_size));
+        //    }
+        //    std::cout << "Blur size " << blur_size << std::endl;
+        //    break;
         default:
             break;
             }
